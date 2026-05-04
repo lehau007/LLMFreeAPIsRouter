@@ -16,6 +16,7 @@ export function validateEnv() {
   }
 
   if (config.masterKey.length < 32) {
-    console.warn('WARNING: MASTER_KEY should be at least 32 characters long for better security.');
+    console.error('CRITICAL: MASTER_KEY must be at least 32 characters long for AES-256 validation.');
+    process.exit(1);
   }
 }

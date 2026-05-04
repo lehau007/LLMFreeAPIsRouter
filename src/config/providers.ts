@@ -9,23 +9,27 @@ import { config as envConfig } from './env';
 export function getProvidersConfig(): ProviderConfig[] {
   const masterKey = envConfig.masterKey!;
   
-  const decryptIfNeeded = (key: string) => {
-    // Basic check to see if it's an encrypted format (contains parts)
+  const decryptIfNeeded = (key: string | undefined, providerName: string) => {
+    if (!key) throw new Error(`Missing API Key for ${providerName}`);
+    
+    // Check if it's in the encrypted format: salt:iv:authTag:encryptedText
     if (key.includes(':') && key.split(':').length === 4) {
       try {
         return EncryptionUtil.decrypt(key, masterKey);
       } catch (e) {
-        console.error('Failed to decrypt API key. Using as-is.');
+        console.warn(`Warning: Failed to decrypt API key for ${providerName}. Using as plain text.`);
         return key;
       }
     }
+    
+    // If not in encrypted format, assume it's a plain text key
     return key;
   };
 
   return [
     {
       name: 'Google',
-      apiKey: decryptIfNeeded(process.env.GOOGLE_API_KEY || 'dummy_key'),
+      apiKey: decryptIfNeeded(process.env.GOOGLE_API_KEY, 'Google'),
       models: [
         {
           id: 'claude-3-haiku-20240307', 
@@ -46,7 +50,7 @@ export function getProvidersConfig(): ProviderConfig[] {
     },
     {
       name: 'Groq',
-      apiKey: decryptIfNeeded(process.env.GROQ_API_KEY || 'dummy_key'),
+      apiKey: decryptIfNeeded(process.env.GROQ_API_KEY, 'Groq'),
       models: [
         {
           id: 'claude-3-haiku-20240307',

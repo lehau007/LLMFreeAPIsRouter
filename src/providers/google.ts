@@ -40,7 +40,7 @@ export class GoogleProvider extends BaseProvider {
   }
 
   async chat(request: ChatRequest, mappedModelId: string): Promise<ChatResponse> {
-    const url = `${this.config.baseUrl}/${mappedModelId}:generateContent?key=${this.config.apiKey}`;
+    const url = `${this.config.baseUrl}/${mappedModelId}:generateContent`;
     const body = this.translateRequest(request);
 
     const controller = new AbortController();
@@ -49,7 +49,10 @@ export class GoogleProvider extends BaseProvider {
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-goog-api-key': this.config.apiKey
+        },
         body: JSON.stringify(body),
         signal: controller.signal
       });
@@ -83,12 +86,15 @@ export class GoogleProvider extends BaseProvider {
   }
 
   async *streamChat(request: ChatRequest, mappedModelId: string): AsyncIterable<StreamEvent> {
-    const url = `${this.config.baseUrl}/${mappedModelId}:streamGenerateContent?alt=sse&key=${this.config.apiKey}`;
+    const url = `${this.config.baseUrl}/${mappedModelId}:streamGenerateContent?alt=sse`;
     const body = this.translateRequest(request);
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-goog-api-key': this.config.apiKey
+      },
       body: JSON.stringify(body)
     });
 

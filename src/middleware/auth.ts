@@ -24,13 +24,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
   // Valid tokens defined in environment (comma separated)
   // Format: freellmapi-v1-xxxxxxxx
-  const validTokens = (process.env.CLIENT_TOKENS || '').split(',');
-
-  // For development, if no tokens are set, allow a default one
-  const isDev = process.env.NODE_ENV === 'development';
-  if (isDev && token === 'dev-token') {
-    return next();
-  }
+  const validTokens = (process.env.CLIENT_TOKENS || '').split(',').map(t => t.trim());
 
   if (!validTokens.includes(token)) {
     return res.status(401).json({

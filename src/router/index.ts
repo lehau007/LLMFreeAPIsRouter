@@ -21,6 +21,9 @@ export class Router {
       const modelConfig = provider.config.models.find(m => m.id === modelId);
       if (modelConfig) {
         available.push({ provider, config: modelConfig });
+      } else if (mode === 'flexible' && provider.config.models.length > 0) {
+        const fallbackConfig = [...provider.config.models].sort((a,b) => (a.priority ?? 99) - (b.priority ?? 99))[0];
+        available.push({ provider, config: fallbackConfig });
       }
     }
 
@@ -49,6 +52,7 @@ export class Router {
         console.log(`[Router] Attempting with ${providerName} (${providerModelId})...`);
         
         const response = await candidate.provider.chat(request, providerModelId);
+        response.model = `${providerName.toLowerCase()}:${providerModelId}:v1`;
         
         const duration = Date.now() - start;
         candidate.provider.recordSuccess(duration);
@@ -73,34 +77,45 @@ export class Router {
 
     console.log(`[Router] Routing stream request for ${request.model}. Candidates: ${candidates.map(c => c.provider.getName()).join(', ')}`);
 
-    // We only try failover for the initial connection in streaming
+    let lastError: any;
+
     for (const candidate of candidates) {
+      const providerModelId = candidate.config.providerModelId;
+      let stream;
+      let iterator;
+      let firstResult;
+      
       try {
-        const providerModelId = candidate.config.providerModelId;
-        const stream = candidate.provider.streamChat(request, providerModelId);
-        
-        // Try to get the first event to see if connection is OK
-        const iterator = stream[Symbol.asyncIterator]();
-        const firstResult = await iterator.next();
+        stream = candidate.provider.streamChat(request, providerModelId);
+        iterator = stream[Symbol.asyncIterator]();
+        firstResult = await iterator.next();
         
         if (firstResult.done) throw new Error('Empty stream');
-        
-        // If we got here, connection started successfully
-        yield firstResult.value;
-        
-        // Yield the rest
-        while (true) {
-          const { done, value } = await readerNext(iterator);
-          if (done) break;
-          yield value;
-        }
-        
-        candidate.provider.recordSuccess(100); // Placeholder latency
-        return; // Success
       } catch (error: any) {
         this.handleProviderError(candidate.provider, error);
         lastError = error;
         console.warn(`Streaming failover from ${candidate.provider.getName()} due to:`, error.message);
+        continue;
+      }
+      
+      // Connection succeeded
+      try {
+        const firstValue = firstResult.value;
+        if (firstValue.type === 'message_start' && firstValue.message) {
+          firstValue.message.model = `${candidate.provider.getName().toLowerCase()}:${providerModelId}:v1`;
+        }
+        yield firstValue;
+        
+        while (true) {
+          const { done, value } = await iterator.next();
+          if (done) break;
+          yield value;
+        }
+        candidate.provider.recordSuccess(100); // Placeholder latency
+        return; // Success
+      } catch (streamError: any) {
+        yield { type: 'error', error: { type: 'api_error', message: `Stream failed mid-flight: ${streamError.message}` } };
+        return; // Fail-fast mid-stream
       }
     }
     
@@ -108,13 +123,11 @@ export class Router {
   }
 
   private handleProviderError(provider: BaseProvider, error: any) {
-    const isRateLimit = error.message.includes('429');
-    const isServerError = error.message.includes('500');
+    const msg = error.message || '';
+    const isRateLimit = msg.includes('429') || msg.includes('Quota Exceeded');
+    const isServerError = msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504') || msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('reset');
     provider.recordFailure(isRateLimit, isServerError);
   }
 }
 
-// Helper to handle iterator next
-async function readerNext(iterator: AsyncGenerator | AsyncIterator<any>) {
-  return await iterator.next();
-}
+// Removed unused readerNext

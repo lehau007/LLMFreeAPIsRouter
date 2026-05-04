@@ -9,7 +9,14 @@ A resilient, high-availability proxy for free-tier LLM APIs with Anthropic-compa
 - **Streaming:** Full SSE support for streaming tokens.
 - **Security:** AES-256-GCM encryption for upstream API keys.
 
-## Setup
+## Quick Start (Windows)
+
+1. **Setup:** Double-click `setup-windows.ps1` (or run it in PowerShell) to install dependencies and create your `.env` file.
+2. **Configure:** Open `.env` and set your `MASTER_KEY` (must be at least 32 characters).
+3. **Encrypt Keys:** Run `npm run vault` to encrypt your Google or Groq API keys, then paste them into `.env`.
+4. **Run:** Double-click `run.bat` or run `npm run dev`.
+
+## Manual Setup
 
 1. **Install Dependencies:**
    ```bash
@@ -25,13 +32,13 @@ A resilient, high-availability proxy for free-tier LLM APIs with Anthropic-compa
 3. **Secure Your API Keys:**
    Use the built-in Vault utility to encrypt your Google/Groq API keys:
    ```bash
-   npx ts-node src/cli/vault.ts
+   npm run vault
    ```
    Choose `e` (encrypt), enter your key, and paste the resulting string into your `.env` (e.g., `GOOGLE_API_KEY=salt:iv:authTag:encryptedText`).
 
 4. **Run the Server:**
    ```bash
-   # Development
+   # Development (with hot reload)
    npm run dev
    
    # Production

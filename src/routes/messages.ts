@@ -21,8 +21,8 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
   try {
     const chatRequest: ChatRequest = req.body;
     
-    if (!chatRequest.model || !chatRequest.messages) {
-      return res.status(400).json({ error: 'Missing required fields: model, messages' });
+    if (!chatRequest.model || !chatRequest.messages || chatRequest.max_tokens === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: model, messages, max_tokens' });
     }
 
     const mode = (req.headers['x-routing-mode'] as 'strict' | 'flexible') || 'flexible';
@@ -35,7 +35,12 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
 
       try {
         const stream = appRouter.routeStreamChat(chatRequest, mode);
+        let isFirstEvent = true;
         for await (const event of stream) {
+          if (isFirstEvent && event.type === 'message_start' && event.message?.model) {
+            res.setHeader('x-actual-model', event.message.model);
+            isFirstEvent = false;
+          }
           res.write(`event: ${event.type}\n`);
           res.write(`data: ${JSON.stringify(event)}\n\n`);
           
@@ -60,15 +65,28 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
 
   } catch (error: any) {
     console.error('Routing Error:', error);
-    const isRateLimit = error.message.includes('429');
-    const statusCode = isRateLimit ? 429 : 500;
-    const errType = isRateLimit ? 'rate_limit_error' : 'api_error';
+    let statusCode = 500;
+    let errType = 'api_error';
+    
+    const errMessage = error.message || '';
+    if (errMessage.includes('429') || errMessage.includes('Quota Exceeded')) {
+      statusCode = 429;
+      errType = 'rate_limit_error';
+    } else if (errMessage.includes('502') || errMessage.includes('503') || errMessage.includes('504')) {
+      statusCode = 500;
+      errType = 'overloaded_error';
+    } else if (errMessage.includes('400') || errMessage.includes('422')) {
+      statusCode = 400;
+      errType = 'invalid_request_error';
+    } else if (errMessage.includes('Timeout') || errMessage.includes('Conn. Reset') || errMessage.includes('reset') || typeof errMessage === 'string') {
+      // Defaults to 500 / api_error which we initialized
+    }
 
     return res.status(statusCode).json({
       type: 'error',
       error: {
         type: errType,
-        message: error.message || 'Internal Server Error'
+        message: errMessage || 'Internal Server Error'
       }
     });
   }
