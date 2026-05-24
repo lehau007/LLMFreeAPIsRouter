@@ -133,7 +133,17 @@ async function discoverOne(entry: ProviderRegistryEntry): Promise<ProviderDiscov
     return { configured, discovered: [], added: [], removed: [], details: {}, error: `No discovery handler for provider ${entry.name}` };
   }
   try {
-    return await fn(configured, keys[0]);
+    const result = await fn(configured, keys[0]);
+    // Drop excluded ids from `added` so the refresh agent doesn't re-suggest them.
+    // They still appear in `discovered` so we can see they exist upstream.
+    const excluded = new Set(entry.excluded ?? []);
+    if (excluded.size > 0) {
+      result.added = result.added.filter(id => !excluded.has(id));
+      for (const id of [...Object.keys(result.details)]) {
+        if (excluded.has(id)) delete result.details[id];
+      }
+    }
+    return result;
   } catch (e: any) {
     return { configured, discovered: [], added: [], removed: [], details: {}, error: e.message };
   }
