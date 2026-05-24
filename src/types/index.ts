@@ -3,9 +3,21 @@ export interface MessageContent {
   text: string;
 }
 
+export interface ImageContent {
+  type: 'image';
+  source: {
+    type: 'base64' | 'url';
+    media_type?: string;
+    data?: string;
+    url?: string;
+  };
+}
+
+export type AnyContent = MessageContent | ImageContent;
+
 export interface Message {
   role: 'user' | 'assistant';
-  content: string | MessageContent[];
+  content: string | AnyContent[];
 }
 
 export interface ChatRequest {
@@ -63,16 +75,20 @@ export interface StreamEvent {
 }
 
 export interface ModelConfig {
-  id: string; 
-  providerModelId: string; 
-  priority?: number; 
-  weight?: number; 
+  id: string;
+  providerModelId: string;
+  priority?: number;
+  weight?: number;
+  capability?: 'text' | 'multimodal';
+  tier?: 'fast' | 'balanced' | 'powerful';
 }
 
 export interface ProviderConfig {
   name: string;
   baseUrl?: string;
-  apiKey: string; 
+  apiKeys: string[];
   models: ModelConfig[];
   timeoutMs?: number;
+  rpm?: number | null;
+  rpd?: number | null;
 }

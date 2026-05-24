@@ -1,8 +1,9 @@
 import app from './app';
 import { config, validateEnv } from './config/env';
+import { cleanupOldLogs } from './utils/logger';
 
-// Validate environment variables before starting
 validateEnv();
+cleanupOldLogs();
 
 const PORT = config.port;
 

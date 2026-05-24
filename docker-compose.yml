@@ -10,4 +10,27 @@ services:
       - CLIENT_TOKENS=${CLIENT_TOKENS}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-7}
+    volumes:
+      - logs_data:/app/logs
     restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=frser-sqlite-datasource
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - logs_data:/var/lib/grafana/logs:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - router
+    restart: always
+
+volumes:
+  logs_data:
+  grafana_data:

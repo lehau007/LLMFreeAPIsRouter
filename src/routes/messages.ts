@@ -1,9 +1,10 @@
 import { Router as ExpressRouter, Request, Response } from 'express';
-import { Router as CustomRouter } from '../router';
+import { Router as CustomRouter, RouteContext } from '../router';
 import { getProvidersConfig } from '../config/providers';
 import { GoogleProvider } from '../providers/google';
 import { GroqProvider } from '../providers/groq';
 import { ChatRequest } from '../types';
+import { setLock, getLock, clearLock } from '../utils/modelLock';
 
 const router = ExpressRouter();
 
@@ -25,7 +26,28 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
       return res.status(400).json({ error: 'Missing required fields: model, messages, max_tokens' });
     }
 
-    const mode = (req.headers['x-routing-mode'] as 'strict' | 'flexible') || 'flexible';
+    const rawMode = req.headers['x-routing-mode'];
+    const mode: 'strict' | 'flexible' = (rawMode === 'strict' || rawMode === 'flexible') ? rawMode : 'flexible';
+    const clientToken: string = res.locals.clientToken;
+
+    // Handle x-lock-model header
+    const lockHeader = req.headers['x-lock-model'] as string | undefined;
+    if (lockHeader) {
+      if (lockHeader === 'clear') {
+        clearLock(clientToken);
+      } else {
+        // Accepts "providerName:providerModelId" or "providerName:providerModelId:v1"
+        const parts = lockHeader.replace(/:v\d+$/, '').split(':');
+        if (parts.length >= 2) {
+          const providerName = parts[0];
+          const providerModelId = parts.slice(1).join(':');
+          setLock(clientToken, providerName, providerModelId);
+        }
+      }
+    }
+
+    const lockedTarget = getLock(clientToken) ?? undefined;
+    const ctx: RouteContext = { attempts: 0 };
 
     // Handle Streaming
     if (chatRequest.stream) {
@@ -34,11 +56,12 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
       res.setHeader('Connection', 'keep-alive');
 
       try {
-        const stream = appRouter.routeStreamChat(chatRequest, mode);
+        const stream = appRouter.routeStreamChat(chatRequest, mode, lockedTarget, ctx);
         let isFirstEvent = true;
         for await (const event of stream) {
           if (isFirstEvent && event.type === 'message_start' && event.message?.model) {
             res.setHeader('x-actual-model', event.message.model);
+            res.setHeader('x-fallback-attempts', String(Math.max(0, ctx.attempts - 1)));
             isFirstEvent = false;
           }
           res.write(`event: ${event.type}\n`);
@@ -59,8 +82,9 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
     }
 
     // Handle Non-Streaming
-    const response = await appRouter.routeChat(chatRequest, mode);
+    const response = await appRouter.routeChat(chatRequest, mode, lockedTarget, ctx);
     res.setHeader('x-actual-model', response.model);
+    res.setHeader('x-fallback-attempts', String(Math.max(0, ctx.attempts - 1)));
     return res.status(200).json(response);
 
   } catch (error: any) {
@@ -69,7 +93,10 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
     let errType = 'api_error';
     
     const errMessage = error.message || '';
-    if (errMessage.includes('429') || errMessage.includes('Quota Exceeded')) {
+    if (error?.name === 'InvalidImageURLError') {
+      statusCode = 400;
+      errType = 'invalid_request_error';
+    } else if (errMessage.includes('429') || errMessage.includes('Quota Exceeded')) {
       statusCode = 429;
       errType = 'rate_limit_error';
     } else if (errMessage.includes('502') || errMessage.includes('503') || errMessage.includes('504')) {

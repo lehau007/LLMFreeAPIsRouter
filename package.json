@@ -7,6 +7,7 @@
     "build": "tsc",
     "dev": "node \"node_modules/nodemon/bin/nodemon.js\" src/index.ts",
     "vault": "node \"node_modules/ts-node/dist/bin.js\" src/cli/vault.ts",
+    "refresh-models": "node \"node_modules/ts-node/dist/bin.js\" scripts/refreshModels.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,10 +15,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "better-sqlite3": "^12.10.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.6",
     "@types/node": "^25.6.0",
     "nodemon": "^3.1.14",

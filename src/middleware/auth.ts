@@ -36,5 +36,6 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     });
   }
 
+  res.locals.clientToken = token;
   next();
 }

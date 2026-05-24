@@ -1,0 +1,2 @@
+Lên kế hoạch bổ sung OpenRouter free tier
+Dù GEMINI model vẫn chưa dùng hết nhưng mà dường như API không switch được tự GROQ sang GOOGLE - Sau khi tham khảo log thì tôi thấy Groq đã cố để switch sang provider GOOGLE nhưng liên tục fetch fail ở mô hình Gemma 4, gemini 2.5 flash thì đã ra đi. Tôi dự tính sẽ đưa sang gemini-3.1-flash-lite. Timeout hình như đang để quá dài, hoặc đang không thể chủ động ngắt kết nối, bằng chứng là latency 1743013 ms 

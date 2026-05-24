@@ -1,5 +1,8 @@
 import dotenv from 'dotenv';
-dotenv.config();
+// quiet:true suppresses the "◇ injected env (N)..." banner that dotenv writes
+// to stdout. CLI scripts (scripts/refreshModels.ts) emit JSON on stdout and
+// any extra text breaks downstream JSON.parse.
+dotenv.config({ quiet: true });
 
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
