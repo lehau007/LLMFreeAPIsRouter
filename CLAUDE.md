@@ -9,14 +9,23 @@ LLMFreeAPIsRouter is a proxy server exposing an Anthropic-compatible `/v1/messag
 ## Commands
 
 ```bash
-npm run dev       # Development server with hot reload (nodemon)
-npm run build     # Compile TypeScript → dist/
-npm start         # Run compiled production build
-npm run vault     # CLI for encrypting/decrypting provider API keys
-docker-compose up -d  # Build and run in Docker
+npm run dev             # Development server with hot reload (nodemon)
+npm run build           # Compile TypeScript → dist/
+npm start               # Run compiled production build
+npm run vault           # CLI for encrypting/decrypting provider API keys
+npm run refresh-models  # Diff live provider catalogs vs PROVIDER_REGISTRY → stdout JSON
+docker-compose up -d    # Build and run in Docker
 ```
 
 No lint or test scripts are configured.
+
+## Catalog refresh workflow
+
+`src/config/providers.ts` is hand-maintained but kept in sync with upstream model lists via a manual playbook (see [docs/REFRESH_MODELS.md](docs/REFRESH_MODELS.md)). The script `scripts/refreshModels.ts` is **discovery-only** — it never mutates `providers.ts`. Judgment about which model belongs (vision support, tier, preview-vs-GA) lives in the human/LLM layer.
+
+Each provider entry has an `excluded: string[]` field for `providerModelId`s we explicitly never want — TTS, image-gen, robotics, preview, moderation classifiers, volatile aliases. The refresh script filters these out of `added` so they don't get re-suggested on every run.
+
+When the user asks to "refresh models" / "check for new models" / "update the model catalog", follow the playbook prompt in `docs/REFRESH_MODELS.md`.
 
 ## Architecture
 

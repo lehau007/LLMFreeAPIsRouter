@@ -18,6 +18,7 @@ A self-hosted proxy that exposes an **Anthropic-compatible `/v1/messages` API** 
 - **Streaming** — full SSE with 15s stall-timeout detection per chunk
 - **Encrypted key storage** — AES-256-GCM via `npm run vault`
 - **Observability** — request logs in SQLite (incl. `key_index` + `fallback_attempts`); `x-fallback-attempts` response header; Grafana datasource pre-provisioned
+- **Manual catalog refresh** — `npm run refresh-models` diffs the live model lists from each provider against `src/config/providers.ts`. Pair with Claude Code (see [docs/REFRESH_MODELS.md](docs/REFRESH_MODELS.md)) to auto-classify + edit + commit; or run alone for a JSON report
 
 ---
 
@@ -186,13 +187,23 @@ Logs older than `LOG_RETENTION_DAYS` days are deleted on each server start.
 ## Development
 
 ```bash
-npm run dev       # Dev server with hot reload (nodemon)
-npm run build     # Compile TypeScript → dist/
-npm start         # Run compiled build
-npm run vault     # CLI for encrypting / decrypting API keys
+npm run dev             # Dev server with hot reload (nodemon)
+npm run build           # Compile TypeScript → dist/
+npm start               # Run compiled build
+npm run vault           # CLI for encrypting / decrypting API keys
+npm run refresh-models  # Diff live provider catalogs vs src/config/providers.ts (see docs/REFRESH_MODELS.md)
 ```
 
 No lint or test scripts are configured.
+
+### Refreshing the model catalog
+
+Google and Groq routinely add and remove free-tier models. `src/config/providers.ts` is the source of truth for what the router will route to. Periodically (every few weeks, or after seeing 404s in logs), refresh it:
+
+- **Quick check** — `npm run refresh-models` prints a JSON diff against the live model lists. No edits are made.
+- **Full refresh via Claude Code** — paste the playbook prompt from [docs/REFRESH_MODELS.md](docs/REFRESH_MODELS.md) into a Claude Code session in this repo. Claude will run the script, web-search vision support for new models, edit `providers.ts`, run the build, and commit.
+
+The script needs `GOOGLE_API_KEY` and `GROQ_API_KEY` in `.env` to authenticate `models.list` calls — no inference happens, so a dedicated low-privilege key is fine.
 
 ---
 
